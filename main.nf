@@ -23,6 +23,7 @@ include { KRAKEN2                                         } from './modules/krak
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
+include { SORTMERNA_INDEX                                 } from './modules/sortmerna'
 include { SORTMERNA                                       } from './modules/sortmerna'
 include { MULTIQC                                         } from './modules/multiqc'
 include { PREPARE_MULTIQC_CONFIG                          } from './modules/prepare_multiqc_config'
@@ -308,10 +309,21 @@ workflow {
                 .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
                 .collect()
 
+            // Build or reuse index
+            // On first run: SORTMERNA_INDEX builds the index and publishes it to
+            //   <outdir>/sortmerna/idx — provide this path as --sortmerna_index on
+            //   subsequent runs to skip the index-building step entirely.
+            if (params.sortmerna_index) {
+                ch_sortmerna_index = Channel.value(file(params.sortmerna_index))
+            } else {
+                SORTMERNA_INDEX(ch_sortmerna_fastas)
+                ch_sortmerna_index = SORTMERNA_INDEX.out.index
+            }
+
             // Subsample reads before SortMeRNA (1M reads is sufficient for rRNA estimation)
             SEQTK_SUBSAMPLE_SORTMERNA(ch_reads, params.sortmerna_subsample)
 
-            SORTMERNA(SEQTK_SUBSAMPLE_SORTMERNA.out.reads, ch_sortmerna_fastas)
+            SORTMERNA(SEQTK_SUBSAMPLE_SORTMERNA.out.reads, ch_sortmerna_fastas, ch_sortmerna_index)
             ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
         }
     }
