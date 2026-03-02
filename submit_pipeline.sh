@@ -48,6 +48,7 @@ SLURM_CONFIG="/home/groups/compgen/lwange/isilon/lwange/singularity/basicqc/slur
 FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/FastQ_Screen_Genomes/FastQ_Screen_Genomes/fastq_screen.conf"
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/sex_markers/all_sex_markers.fasta"
+SORTMERNA_DB="/scratch/data/Illumina_CryoZoo/genomes/databases/rRNA_indices"
 
 # Create run directory and work from there to avoid lock conflicts
 RUN_DIR="$(dirname $OUTDIR)"
@@ -63,9 +64,10 @@ echo "Project:      $PROJECT_NAME"
 echo "Application:  $APPLICATION"
 echo ""
 echo "Databases:"
-echo "  FastQ Screen: $FASTQ_SCREEN_CONF"
+echo "  FastQ Screen:  $FASTQ_SCREEN_CONF"
 echo "  Kraken2 mtDNA: $KRAKEN2_DB"
 echo "  Sex markers:   $SEX_MARKERS_DB"
+echo "  SortMeRNA:     $SORTMERNA_DB"
 echo ""
 
 # Load modules if needed (uncomment/modify as needed)
@@ -80,8 +82,10 @@ nextflow run ${PIPELINE_DIR}/main.nf \
     --kraken2_db "$KRAKEN2_DB" \
     --kraken2_subsample 1000000 \
     --sex_markers_db "$SEX_MARKERS_DB" \
+    --sortmerna_db "$SORTMERNA_DB" \
     --project_name "$PROJECT_NAME" \
     --application "$APPLICATION" \
+    --name $PROJECT_NAME.$APPLICATION \
     -w "${RUN_DIR}/work" \
     -profile singularity \
     -c $SLURM_CONFIG \

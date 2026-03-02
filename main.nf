@@ -15,16 +15,18 @@
 nextflow.enable.dsl = 2
 
 // Import modules
-include { FASTQC                  } from './modules/fastqc'
-include { FASTQ_SCREEN            } from './modules/fastq_screen'
-include { SEQTK_SUBSAMPLE         } from './modules/seqtk_subsample'
-include { KRAKEN2                 } from './modules/kraken2'
-include { SUMMARIZE_KRAKEN2       } from './modules/summarize_kraken2'
-include { SEX_DETERMINATION       } from './modules/sex_determination'
-include { SUMMARIZE_SEX           } from './modules/sex_determination'
-include { MULTIQC                 } from './modules/multiqc'
-include { PREPARE_MULTIQC_CONFIG  } from './modules/prepare_multiqc_config'
-include { SUMMARIZE_RESULTS       } from './modules/summarize_results'
+include { FASTQC                                          } from './modules/fastqc'
+include { FASTQ_SCREEN                                    } from './modules/fastq_screen'
+include { SEQTK_SUBSAMPLE                                 } from './modules/seqtk_subsample'
+include { SEQTK_SUBSAMPLE as SEQTK_SUBSAMPLE_SORTMERNA   } from './modules/seqtk_subsample'
+include { KRAKEN2                                         } from './modules/kraken2'
+include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
+include { SEX_DETERMINATION                               } from './modules/sex_determination'
+include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
+include { SORTMERNA                                       } from './modules/sortmerna'
+include { MULTIQC                                         } from './modules/multiqc'
+include { PREPARE_MULTIQC_CONFIG                          } from './modules/prepare_multiqc_config'
+include { SUMMARIZE_RESULTS                               } from './modules/summarize_results'
 
 /*
 ========================================================================================
@@ -49,10 +51,13 @@ def helpMessage() {
       --kraken2_db          Path to Kraken2 database
       --kraken2_subsample   Number of reads to subsample for Kraken2 (default: 5000000)
       --sex_markers_db      Path to sex marker FASTA for sex determination
+      --sortmerna_db        Path to directory containing rRNA FASTA database files
+      --sortmerna_subsample Number of reads to subsample for SortMeRNA (default: 1000000)
       --skip_fastqc         Skip FastQC step
       --skip_fastq_screen   Skip FastQ Screen step
       --skip_kraken2        Skip Kraken2 step
       --skip_sex_determination  Skip sex determination step
+      --skip_sortmerna      Skip SortMeRNA rRNA quantification step
       --project_name        Project name for MultiQC report header (e.g., 'CGLZOO_01')
       --application         Application type for MultiQC header (e.g., 'RNA-seq')
       -profile              Configuration profile (singularity, docker, conda)
@@ -288,6 +293,26 @@ workflow {
             ch_sex_results = SEX_DETERMINATION.out.results.map { it[1] }.collect()
             SUMMARIZE_SEX(ch_sex_results, ch_sex_metadata)
             ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE_SEX.out.summary)
+        }
+    }
+
+    //
+    // MODULE: SortMeRNA — rRNA quantification (per library, all samples)
+    //
+    if (!params.skip_sortmerna) {
+        if (!params.sortmerna_db) {
+            log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping rRNA quantification."
+        } else {
+            // Collect all rRNA FASTA files from the database directory
+            ch_sortmerna_fastas = Channel
+                .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
+                .collect()
+
+            // Subsample reads before SortMeRNA (1M reads is sufficient for rRNA estimation)
+            SEQTK_SUBSAMPLE_SORTMERNA(ch_reads, params.sortmerna_subsample)
+
+            SORTMERNA(SEQTK_SUBSAMPLE_SORTMERNA.out.reads, ch_sortmerna_fastas)
+            ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
         }
     }
 
