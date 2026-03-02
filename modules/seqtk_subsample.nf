@@ -29,8 +29,10 @@ process SEQTK_SUBSAMPLE {
     if (reads instanceof List && reads.size() == 2) {
         // Paired-end
         """
-        seqtk sample -s${seed} ${reads[0]} ${n_reads} | gzip -c > ${prefix}_1.subsampled.fastq.gz
-        seqtk sample -s${seed} ${reads[1]} ${n_reads} | gzip -c > ${prefix}_2.subsampled.fastq.gz
+        seqtk sample -s${seed} ${reads[0]} ${n_reads} | gzip -c > ${prefix}_1.subsampled.fastq.gz \\
+            || cp ${reads[0]} ${prefix}_1.subsampled.fastq.gz
+        seqtk sample -s${seed} ${reads[1]} ${n_reads} | gzip -c > ${prefix}_2.subsampled.fastq.gz \\
+            || cp ${reads[1]} ${prefix}_2.subsampled.fastq.gz
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
@@ -40,7 +42,8 @@ process SEQTK_SUBSAMPLE {
     } else {
         // Single-end
         """
-        seqtk sample -s${seed} ${reads} ${n_reads} | gzip -c > ${prefix}.subsampled.fastq.gz
+        seqtk sample -s${seed} ${reads} ${n_reads} | gzip -c > ${prefix}.subsampled.fastq.gz \\
+            || cp ${reads} ${prefix}.subsampled.fastq.gz
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
