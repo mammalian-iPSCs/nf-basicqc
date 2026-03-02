@@ -89,6 +89,7 @@ module_order:
     - custom_content
     - fastqc
     - fastq_screen
+    - sortmerna
     - kraken
 
 # Kraken2 plot configuration - show enough species for all samples
@@ -103,6 +104,10 @@ table_columns_visible:
         avg_sequence_length: True
         percent_fails: False
         total_sequences: True
+    SortMeRNA:
+        pct_rRNA: True
+        rRNA: False
+        non_rRNA: False
     "Custom content: kraken2_top_species_mqc":
         percent_classified: True
         top_genus: True
@@ -115,6 +120,8 @@ table_columns_visible:
 
 # Column ordering - put our custom columns first
 table_columns_placement:
+    SortMeRNA:
+        pct_rRNA: 95
     "Custom content: kraken2_top_species_mqc":
         percent_classified: 100
         top_genus: 110
