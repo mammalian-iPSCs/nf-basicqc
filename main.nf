@@ -356,17 +356,17 @@ workflow {
     //
     // Collect FastQC zip files
     ch_fastqc_for_summary = params.skip_fastqc
-        ? Channel.of(file("NO_FILE"))
+        ? Channel.of(file("NO_FASTQC"))
         : FASTQC.out.zip.map { it[1] }.collect()
 
     // Get Kraken2 summary (or placeholder)
     ch_kraken2_for_summary = (params.skip_kraken2 || !params.kraken2_db)
-        ? Channel.of(file("NO_FILE"))
+        ? Channel.of(file("NO_KRAKEN2"))
         : SUMMARIZE_KRAKEN2.out.summary
 
     // Get sex determination summary (or placeholder)
     ch_sex_for_summary = (params.skip_sex_determination || !params.sex_markers_db)
-        ? Channel.of(file("NO_FILE"))
+        ? Channel.of(file("NO_SEX"))
         : SUMMARIZE_SEX.out.summary
 
     // Parse sample info for summary

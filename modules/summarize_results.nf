@@ -23,7 +23,7 @@ process SUMMARIZE_RESULTS {
     path("qc_summary.tsv"), emit: summary
 
     script:
-    def has_sex = sex_summary.name != 'NO_FILE' ? 'True' : 'False'
+    def has_sex = sex_summary.name != 'NO_SEX' ? 'True' : 'False'
     def sample_info_json = groovy.json.JsonOutput.toJson(sample_info)
     """
     #!/usr/bin/env python3
@@ -103,7 +103,7 @@ process SUMMARIZE_RESULTS {
             print(f"Warning: Could not parse {zip_file}: {e}")
 
     # Parse Kraken2 summary
-    if os.path.exists("${kraken2_summary}"):
+    if "${kraken2_summary}" != "NO_KRAKEN2" and os.path.exists("${kraken2_summary}"):
         with open("${kraken2_summary}", 'r') as f:
             header = None
             for line in f:
@@ -126,7 +126,7 @@ process SUMMARIZE_RESULTS {
 
     # Parse sex determination summary if available
     has_sex = ${has_sex}
-    if has_sex and os.path.exists("${sex_summary}"):
+    if has_sex and "${sex_summary}" != "NO_SEX" and os.path.exists("${sex_summary}"):
         with open("${sex_summary}", 'r') as f:
             header = None
             for line in f:
