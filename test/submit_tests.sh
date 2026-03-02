@@ -17,6 +17,7 @@
 # For FastQC only: sbatch submit_tests.sh --fastqc_only
 # For full pipeline: sbatch submit_tests.sh --full
 # For sex determination test: sbatch submit_tests.sh --sex
+# For SortMeRNA rRNA test: sbatch submit_tests.sh --sortmerna
 
 # Set paths
 PIPELINE_DIR="/scratch_isilon/groups/compgen/lwange/nf-basicqc"
@@ -24,6 +25,7 @@ SLURM_CONFIG="/home/groups/compgen/lwange/isilon/lwange/singularity/basicqc/slur
 FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/FastQ_Screen_Genomes/FastQ_Screen_Genomes/fastq_screen.conf"
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/sex_markers/all_sex_markers.fasta"
+SORTMERNA_DB="/scratch/data/Illumina_CryoZoo/genomes/databases/rRNA_indices"
 
 # Project metadata for MultiQC report
 PROJECT_NAME="CGLZOO_01"
@@ -107,12 +109,37 @@ if [[ "$arg1" == "--full" ]]; then
         --kraken2_db $KRAKEN2_DB \
         --kraken2_subsample 100000 \
         --sex_markers_db $SEX_MARKERS_DB \
+        --sortmerna_db $SORTMERNA_DB \
+        --sortmerna_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
         -profile singularity -c $SLURM_CONFIG \
         -resume
     echo "$(date) === Full pipeline test complete ==="
     echo "Check results in: $PIPELINE_DIR/test/results_full"
+    exit 0
+fi
+
+# SortMeRNA rRNA quantification test only
+if [[ "$arg1" == "--sortmerna" ]]; then
+    echo "$(date) === Running SortMeRNA rRNA quantification test ==="
+    nextflow run main.nf \
+        --input test/test_samplesheet.csv \
+        --outdir test/results_sortmerna \
+        --skip_fastqc \
+        --skip_fastq_screen \
+        --skip_kraken2 \
+        --skip_sex_determination \
+        --sortmerna_db $SORTMERNA_DB \
+        --sortmerna_subsample 100000 \
+        --project_name $PROJECT_NAME \
+        --application $APPLICATION \
+        -profile singularity -c $SLURM_CONFIG \
+        -resume
+    echo "$(date) === SortMeRNA test complete ==="
+    echo "Check results in: $PIPELINE_DIR/test/results_sortmerna"
+    echo "Index saved to:   $PIPELINE_DIR/test/results_sortmerna/sortmerna/idx"
+    echo "  (reuse with --sortmerna_index to skip rebuilding)"
     exit 0
 fi
 
