@@ -29,10 +29,21 @@ process SEQTK_SUBSAMPLE {
     if (reads instanceof List && reads.size() == 2) {
         // Paired-end
         """
-        seqtk sample -s${seed} ${reads[0]} ${n_reads} | gzip -c > ${prefix}_1.subsampled.fastq.gz \\
-            || cp ${reads[0]} ${prefix}_1.subsampled.fastq.gz
-        seqtk sample -s${seed} ${reads[1]} ${n_reads} | gzip -c > ${prefix}_2.subsampled.fastq.gz \\
-            || cp ${reads[1]} ${prefix}_2.subsampled.fastq.gz
+        # Disable pipefail so PIPESTATUS captures seqtk's exit without aborting the script.
+        # seqtk exits 255 when the file has fewer reads than requested (e.g. small test data);
+        # in that case fall back to using the full file.
+        set +e +o pipefail
+
+        seqtk sample -s${seed} ${reads[0]} ${n_reads} | gzip -c > ${prefix}_1.subsampled.fastq.gz
+        _rc1=\${PIPESTATUS[0]}
+
+        seqtk sample -s${seed} ${reads[1]} ${n_reads} | gzip -c > ${prefix}_2.subsampled.fastq.gz
+        _rc2=\${PIPESTATUS[0]}
+
+        set -e -o pipefail
+
+        [ \${_rc1} -eq 0 ] || cp ${reads[0]} ${prefix}_1.subsampled.fastq.gz
+        [ \${_rc2} -eq 0 ] || cp ${reads[1]} ${prefix}_2.subsampled.fastq.gz
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
@@ -42,8 +53,14 @@ process SEQTK_SUBSAMPLE {
     } else {
         // Single-end
         """
-        seqtk sample -s${seed} ${reads} ${n_reads} | gzip -c > ${prefix}.subsampled.fastq.gz \\
-            || cp ${reads} ${prefix}.subsampled.fastq.gz
+        set +e +o pipefail
+
+        seqtk sample -s${seed} ${reads} ${n_reads} | gzip -c > ${prefix}.subsampled.fastq.gz
+        _rc=\${PIPESTATUS[0]}
+
+        set -e -o pipefail
+
+        [ \${_rc} -eq 0 ] || cp ${reads} ${prefix}.subsampled.fastq.gz
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
