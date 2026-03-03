@@ -18,13 +18,14 @@ nextflow.enable.dsl = 2
 include { FASTQC                                          } from './modules/fastqc'
 include { FASTQ_SCREEN                                    } from './modules/fastq_screen'
 include { SEQTK_SUBSAMPLE                                 } from './modules/seqtk_subsample'
-include { SEQTK_SUBSAMPLE as SEQTK_SUBSAMPLE_SORTMERNA   } from './modules/seqtk_subsample'
+include { SEQTK_SUBSAMPLE as SEQTK_SUBSAMPLE_RRNA         } from './modules/seqtk_subsample'
 include { KRAKEN2                                         } from './modules/kraken2'
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
 include { SORTMERNA_INDEX                                 } from './modules/sortmerna'
 include { SORTMERNA                                       } from './modules/sortmerna'
+include { RIBODETECTOR                                    } from './modules/ribodetector'
 include { MULTIQC                                         } from './modules/multiqc'
 include { PREPARE_MULTIQC_CONFIG                          } from './modules/prepare_multiqc_config'
 include { SUMMARIZE_RESULTS                               } from './modules/summarize_results'
@@ -53,7 +54,8 @@ def helpMessage() {
       --kraken2_subsample   Number of reads to subsample for Kraken2 (default: 5000000)
       --sex_markers_db      Path to sex marker FASTA for sex determination
       --sortmerna_db        Path to directory containing rRNA FASTA database files
-      --sortmerna_subsample Number of reads to subsample for SortMeRNA (default: 1000000)
+      --rrna_subsample      Number of reads to subsample for rRNA tools (default: 1000000)
+      --read_length         Sequenced read length in bp for RiboDetector (default: 150)
       --skip_fastqc         Skip FastQC step
       --skip_fastq_screen   Skip FastQ Screen step
       --skip_kraken2        Skip Kraken2 step
@@ -298,34 +300,49 @@ workflow {
     }
 
     //
-    // MODULE: SortMeRNA — rRNA quantification (per library, all samples)
+    // rRNA quantification: SortMeRNA and/or RiboDetector
+    // Subsampled reads are shared between both tools when both are enabled.
     //
-    if (!params.skip_sortmerna) {
-        if (!params.sortmerna_db) {
-            log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping rRNA quantification."
+    def run_sortmerna    = !params.skip_sortmerna && params.sortmerna_db
+    def run_ribodetector = !params.skip_ribodetector
+
+    if (run_sortmerna || run_ribodetector) {
+        // Subsample once, shared by both tools
+        SEQTK_SUBSAMPLE_RRNA(ch_reads, params.rrna_subsample)
+        ch_rrna_reads = SEQTK_SUBSAMPLE_RRNA.out.reads
+    }
+
+    //
+    // MODULE: SortMeRNA
+    //
+    if (run_sortmerna) {
+        // Collect all rRNA FASTA files from the database directory
+        ch_sortmerna_fastas = Channel
+            .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
+            .collect()
+
+        // Build index once or reuse a pre-built one.
+        // On first run the index is published to <outdir>/sortmerna/idx —
+        // pass it as --sortmerna_index on subsequent runs to skip rebuilding.
+        if (params.sortmerna_index) {
+            ch_sortmerna_index = Channel.value(file(params.sortmerna_index))
         } else {
-            // Collect all rRNA FASTA files from the database directory
-            ch_sortmerna_fastas = Channel
-                .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
-                .collect()
-
-            // Build or reuse index
-            // On first run: SORTMERNA_INDEX builds the index and publishes it to
-            //   <outdir>/sortmerna/idx — provide this path as --sortmerna_index on
-            //   subsequent runs to skip the index-building step entirely.
-            if (params.sortmerna_index) {
-                ch_sortmerna_index = Channel.value(file(params.sortmerna_index))
-            } else {
-                SORTMERNA_INDEX(ch_sortmerna_fastas)
-                ch_sortmerna_index = SORTMERNA_INDEX.out.index
-            }
-
-            // Subsample reads before SortMeRNA (1M reads is sufficient for rRNA estimation)
-            SEQTK_SUBSAMPLE_SORTMERNA(ch_reads, params.sortmerna_subsample)
-
-            SORTMERNA(SEQTK_SUBSAMPLE_SORTMERNA.out.reads, ch_sortmerna_fastas, ch_sortmerna_index)
-            ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
+            SORTMERNA_INDEX(ch_sortmerna_fastas)
+            ch_sortmerna_index = SORTMERNA_INDEX.out.index
         }
+
+        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index)
+        ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
+    } else if (!params.skip_sortmerna) {
+        log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping SortMeRNA."
+    }
+
+    //
+    // MODULE: RiboDetector
+    //
+    if (run_ribodetector) {
+        RIBODETECTOR(ch_rrna_reads, params.read_length)
+        ch_multiqc_files = ch_multiqc_files.mix(RIBODETECTOR.out.log.map { it[1] })
     }
 
     //

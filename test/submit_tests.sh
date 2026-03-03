@@ -110,7 +110,7 @@ if [[ "$arg1" == "--full" ]]; then
         --kraken2_subsample 100000 \
         --sex_markers_db $SEX_MARKERS_DB \
         --sortmerna_db $SORTMERNA_DB \
-        --sortmerna_subsample 100000 \
+        --rrna_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
         -profile singularity -c $SLURM_CONFIG \
@@ -131,7 +131,7 @@ if [[ "$arg1" == "--sortmerna" ]]; then
         --skip_kraken2 \
         --skip_sex_determination \
         --sortmerna_db $SORTMERNA_DB \
-        --sortmerna_subsample 100000 \
+        --rrna_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
         -profile singularity -c $SLURM_CONFIG \
