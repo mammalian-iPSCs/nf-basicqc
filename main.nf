@@ -386,6 +386,16 @@ workflow {
         ? Channel.of(file("NO_SEX"))
         : SUMMARIZE_SEX.out.summary
 
+    // Get SortMeRNA logs (or placeholder)
+    ch_sortmerna_for_summary = (params.skip_sortmerna || !params.sortmerna_db)
+        ? Channel.of(file("NO_SORTMERNA"))
+        : SORTMERNA.out.log.map { it[1] }.collect()
+
+    // Get RiboDetector logs (or placeholder)
+    ch_ribodetector_for_summary = params.skip_ribodetector
+        ? Channel.of(file("NO_RIBODETECTOR"))
+        : RIBODETECTOR.out.log.map { it[1] }.collect()
+
     // Parse sample info for summary
     ch_summary_sample_info = ch_sample_metadata.collect()
 
@@ -393,6 +403,8 @@ workflow {
         ch_fastqc_for_summary,
         ch_kraken2_for_summary,
         ch_sex_for_summary,
+        ch_sortmerna_for_summary,
+        ch_ribodetector_for_summary,
         ch_summary_sample_info
     )
 }

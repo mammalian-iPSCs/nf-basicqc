@@ -6,6 +6,8 @@
     - FastQC: total reads, % duplicates, % GC, avg read length
     - Kraken2: % mtDNA, top genus, % top genus, top species, % top species
     - Sex determination: inferred sex, confidence
+    - SortMeRNA: % rRNA (on subsampled reads)
+    - RiboDetector: % rRNA (on subsampled reads)
 */
 
 process SUMMARIZE_RESULTS {
@@ -16,18 +18,23 @@ process SUMMARIZE_RESULTS {
     input:
     path(fastqc_data)       // FastQC zip files
     path(kraken2_summary)   // kraken2_top_species_mqc.txt
-    path(sex_summary)       // sex_determination_mqc.txt (optional)
+    path(sex_summary)       // sex_determination_mqc.txt (or NO_SEX)
+    path(sortmerna_logs)    // *.sortmerna.log files (or NO_SORTMERNA)
+    path(ribodetector_logs) // *.ribodetector.log files (or NO_RIBODETECTOR)
     val(sample_info)        // List of maps with: sample_name, species
 
     output:
     path("qc_summary.tsv"), emit: summary
 
     script:
-    def has_sex = sex_summary.name != 'NO_SEX' ? 'True' : 'False'
+    def has_sex          = sex_summary.name          != 'NO_SEX'          ? 'True' : 'False'
+    def has_sortmerna    = sortmerna_logs.name        != 'NO_SORTMERNA'    ? 'True' : 'False'
+    def has_ribodetector = ribodetector_logs.name     != 'NO_RIBODETECTOR' ? 'True' : 'False'
     def sample_info_json = groovy.json.JsonOutput.toJson(sample_info)
     """
     #!/usr/bin/env python3
     import os
+    import re
     import json
     import zipfile
     import glob
@@ -143,6 +150,39 @@ process SUMMARIZE_RESULTS {
                     data[sample_name]['inferred_sex'] = parts[1] if len(parts) > 1 else ''
                     data[sample_name]['sex_confidence'] = parts[2] if len(parts) > 2 else ''
 
+    # Parse SortMeRNA logs
+    # Log line: "Total reads passing E-value threshold = N (X.XX%)"
+    # One log per FLI; average across FLIs for the same sample_name.
+    has_sortmerna = ${has_sortmerna}
+    if has_sortmerna:
+        sortmerna_vals = defaultdict(list)
+        for log_file in glob.glob("*.sortmerna.log"):
+            fli = log_file.replace(".sortmerna.log", "")
+            sample_name = fli_to_sample.get(fli, fli)
+            with open(log_file) as f:
+                content = f.read()
+            m = re.search(r'Total reads passing E-value threshold\s*=\s*\d+\s*\(([\d.]+)%\)', content)
+            if m:
+                sortmerna_vals[sample_name].append(float(m.group(1)))
+        for sample_name, vals in sortmerna_vals.items():
+            data[sample_name]['sortmerna_pct_rrna'] = f"{sum(vals)/len(vals):.2f}"
+
+    # Parse RiboDetector logs
+    # Log line: "rRNA sequences: N (X.XX%)"
+    has_ribodetector = ${has_ribodetector}
+    if has_ribodetector:
+        ribodetector_vals = defaultdict(list)
+        for log_file in glob.glob("*.ribodetector.log"):
+            fli = log_file.replace(".ribodetector.log", "")
+            sample_name = fli_to_sample.get(fli, fli)
+            with open(log_file) as f:
+                content = f.read()
+            m = re.search(r'rRNA sequences:\s*\d+\s*\(([\d.]+)%\)', content, re.IGNORECASE)
+            if m:
+                ribodetector_vals[sample_name].append(float(m.group(1)))
+        for sample_name, vals in ribodetector_vals.items():
+            data[sample_name]['ribodetector_pct_rrna'] = f"{sum(vals)/len(vals):.2f}"
+
     # Write output TSV
     columns = [
         'sample_name', 'expected_species', 'total_reads', 'read_length',
@@ -152,6 +192,10 @@ process SUMMARIZE_RESULTS {
     ]
     if has_sex:
         columns.extend(['inferred_sex', 'sex_confidence'])
+    if has_sortmerna:
+        columns.append('sortmerna_pct_rrna')
+    if has_ribodetector:
+        columns.append('ribodetector_pct_rrna')
 
     with open('qc_summary.tsv', 'w') as f:
         f.write('\\t'.join(columns) + '\\n')
@@ -175,6 +219,10 @@ process SUMMARIZE_RESULTS {
                     data[sample_name].get('inferred_sex', ''),
                     data[sample_name].get('sex_confidence', '')
                 ])
+            if has_sortmerna:
+                row.append(data[sample_name].get('sortmerna_pct_rrna', ''))
+            if has_ribodetector:
+                row.append(data[sample_name].get('ribodetector_pct_rrna', ''))
             f.write('\\t'.join(row) + '\\n')
 
     print(f"Generated summary for {len(data)} samples")
