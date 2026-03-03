@@ -163,7 +163,7 @@ process SUMMARIZE_RESULTS {
             sample_name = fli_to_sample.get(fli, fli)
             with open(log_file) as f:
                 content = f.read()
-            m = re.search(r'Total reads passing E-value threshold\s*=\s*\d+\s*\(([\d.]+)%\)', content)
+            m = re.search(r'Total reads passing E-value threshold\\s*=\\s*\\d+\\s*\\(([\\d.]+)%\\)', content)
             if m:
                 sortmerna_vals[sample_name].append(float(m.group(1)))
         for sample_name, vals in sortmerna_vals.items():
@@ -179,7 +179,7 @@ process SUMMARIZE_RESULTS {
             sample_name = fli_to_sample.get(fli, fli)
             with open(log_file) as f:
                 content = f.read()
-            m = re.search(r'rRNA sequences:\s*\d+\s*\(([\d.]+)%\)', content, re.IGNORECASE)
+            m = re.search(r'rRNA sequences:\\s*\\d+\\s*\\(([\\d.]+)%\\)', content, re.IGNORECASE)
             if m:
                 ribodetector_vals[sample_name].append(float(m.group(1)))
         for sample_name, vals in ribodetector_vals.items():
