@@ -24,6 +24,7 @@ include { KRAKEN2 as KRAKEN2_RRNA                         } from './modules/krak
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
+include { SORTMERNA_INDEX                                 } from './modules/sortmerna'
 include { SORTMERNA                                       } from './modules/sortmerna'
 include { RIBODETECTOR                                    } from './modules/ribodetector'
 include { MULTIQC                                         } from './modules/multiqc'
@@ -316,10 +317,10 @@ workflow {
 
     //
     // MODULE: SortMeRNA
-    // Each job builds its own index in its work directory (--index 1).
-    // SortMeRNA hashes index files by reference file PATH, so a shared pre-built
-    // index cannot be reused across Nextflow work directories. Nextflow's -resume
-    // caching avoids rebuilding when inputs haven't changed.
+    // Index is built once per run by SORTMERNA_INDEX and shared across all samples
+    // (same pattern as nf-core/rnaseq). Works because within a run all processes
+    // receive symlinks to the same real FASTA paths, so SortMeRNA's path-based
+    // hash matches. Cross-run index reuse is not supported.
     //
     if (run_sortmerna) {
         // --sortmerna_db can be a single FASTA file or a directory of FASTA files
@@ -327,7 +328,11 @@ workflow {
             ? Channel.fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}").collect()
             : Channel.of(file(params.sortmerna_db)).collect()
 
-        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, run_rrna_kraken2.toString())
+        // Build index once, share across all samples via .first()
+        SORTMERNA_INDEX(ch_sortmerna_fastas)
+        ch_sortmerna_index = SORTMERNA_INDEX.out.index.first()
+
+        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index, run_rrna_kraken2.toString())
         ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
 
         if (run_rrna_kraken2) {
