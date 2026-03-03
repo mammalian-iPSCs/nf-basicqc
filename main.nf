@@ -304,7 +304,7 @@ workflow {
     // rRNA quantification: SortMeRNA and/or RiboDetector
     // Subsampled reads are shared between both tools when both are enabled.
     //
-    def run_sortmerna    = !params.skip_sortmerna && params.sortmerna_db
+    def run_sortmerna    = !params.skip_sortmerna && (params.sortmerna_db || params.sortmerna_index)
     def run_ribodetector = !params.skip_ribodetector
     def run_rrna_kraken2 = !params.skip_rrna_kraken2 && params.rrna_kraken2_db && run_sortmerna
 
@@ -318,9 +318,11 @@ workflow {
     // MODULE: SortMeRNA
     //
     if (run_sortmerna) {
-        // Collect all rRNA FASTA files from the database directory
+        // Locate rRNA FASTA files: use --sortmerna_db if provided, otherwise infer
+        // from the parent directory of --sortmerna_index (index lives in <db>/idx/).
+        def sortmerna_fasta_dir = params.sortmerna_db ?: file(params.sortmerna_index).parent
         ch_sortmerna_fastas = Channel
-            .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
+            .fromPath("${sortmerna_fasta_dir}/*.{fasta,fa,fna}")
             .collect()
 
         // Build index once or reuse a pre-built one.
@@ -346,7 +348,7 @@ workflow {
             )
         }
     } else if (!params.skip_sortmerna) {
-        log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping SortMeRNA."
+        log.warn "No SortMeRNA database (--sortmerna_db) or index (--sortmerna_index) provided. Skipping SortMeRNA."
     }
 
     //
@@ -362,8 +364,8 @@ workflow {
     //
     PREPARE_MULTIQC_CONFIG(
         ch_sample_metadata,
-        params.project_name,
-        params.application
+        params.project_name ?: '',
+        params.application ?: ''
     )
 
     //
