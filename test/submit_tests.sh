@@ -18,6 +18,7 @@
 # For full pipeline: sbatch submit_tests.sh --full
 # For sex determination test: sbatch submit_tests.sh --sex
 # For SortMeRNA rRNA test: sbatch submit_tests.sh --sortmerna
+# For rRNA Kraken2 (SILVA) test: sbatch submit_tests.sh --rrna_kraken2
 
 # Set paths
 PIPELINE_DIR="/scratch_isilon/groups/compgen/lwange/nf-basicqc"
@@ -26,6 +27,7 @@ FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/sex_markers/all_sex_markers.fasta"
 SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices"
+SILVA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_silva_ssu"
 
 # Project metadata for MultiQC report
 PROJECT_NAME="CGLZOO_01"
@@ -140,6 +142,26 @@ if [[ "$arg1" == "--sortmerna" ]]; then
     echo "Check results in: $PIPELINE_DIR/test/results_sortmerna"
     echo "Index saved to:   $PIPELINE_DIR/test/results_sortmerna/sortmerna/idx"
     echo "  (reuse with --sortmerna_index to skip rebuilding)"
+    exit 0
+fi
+
+# rRNA Kraken2 (SILVA SSU) test
+if [[ "$arg1" == "--rrna_kraken2" ]]; then
+    echo "$(date) === Running rRNA Kraken2 (SILVA SSU) test ==="
+    nextflow run main.nf \
+        --input test/test_samplesheet.csv \
+        --outdir test/results_rrna_kraken2 \
+        --skip_fastqc \
+        --skip_fastq_screen \
+        --skip_kraken2 \
+        --skip_sex_determination \
+        --sortmerna_db $SORTMERNA_DB \
+        --rrna_subsample 100000 \
+        --rrna_kraken2_db $SILVA_DB \
+        -profile singularity -c $SLURM_CONFIG \
+        -resume
+    echo "$(date) === rRNA Kraken2 test complete ==="
+    echo "Check results in: $PIPELINE_DIR/test/results_rrna_kraken2"
     exit 0
 fi
 

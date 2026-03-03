@@ -20,6 +20,7 @@ include { FASTQ_SCREEN                                    } from './modules/fast
 include { SEQTK_SUBSAMPLE                                 } from './modules/seqtk_subsample'
 include { SEQTK_SUBSAMPLE as SEQTK_SUBSAMPLE_RRNA         } from './modules/seqtk_subsample'
 include { KRAKEN2                                         } from './modules/kraken2'
+include { KRAKEN2 as KRAKEN2_RRNA                         } from './modules/kraken2'
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
@@ -305,6 +306,7 @@ workflow {
     //
     def run_sortmerna    = !params.skip_sortmerna && params.sortmerna_db
     def run_ribodetector = !params.skip_ribodetector
+    def run_rrna_kraken2 = !params.skip_rrna_kraken2 && params.rrna_kraken2_db && run_sortmerna
 
     if (run_sortmerna || run_ribodetector) {
         // Subsample once, shared by both tools
@@ -331,8 +333,18 @@ workflow {
             ch_sortmerna_index = SORTMERNA_INDEX.out.index
         }
 
-        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index)
+        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index, run_rrna_kraken2.toString())
         ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
+
+        if (run_rrna_kraken2) {
+            ch_rrna_kraken2_db = file(params.rrna_kraken2_db)
+            // Rename sample ID to add _rrna suffix → output files become {fli}_rrna.kraken2.report.txt
+            // This distinguishes them from mtDNA Kraken2 reports in the SUMMARIZE_RESULTS work dir
+            KRAKEN2_RRNA(
+                SORTMERNA.out.rrna_reads.map { sample, reads -> tuple("${sample}_rrna", reads) },
+                ch_rrna_kraken2_db
+            )
+        }
     } else if (!params.skip_sortmerna) {
         log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping SortMeRNA."
     }
@@ -396,6 +408,11 @@ workflow {
         ? Channel.of(file("NO_RIBODETECTOR"))
         : RIBODETECTOR.out.log.map { it[1] }.collect()
 
+    // Get rRNA Kraken2 reports (or placeholder)
+    ch_rrna_kraken2_for_summary = run_rrna_kraken2
+        ? KRAKEN2_RRNA.out.report.map { it[1] }.collect()
+        : Channel.of(file("NO_RRNA_KRAKEN2"))
+
     // Parse sample info for summary
     ch_summary_sample_info = ch_sample_metadata.collect()
 
@@ -405,6 +422,7 @@ workflow {
         ch_sex_for_summary,
         ch_sortmerna_for_summary,
         ch_ribodetector_for_summary,
+        ch_rrna_kraken2_for_summary,
         ch_summary_sample_info
     )
 }

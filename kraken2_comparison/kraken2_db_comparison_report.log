@@ -1,0 +1,74 @@
+=== Kraken2 Database Comparison ===
+Full DB: /scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/kraken
+mtDNA DB: /scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/kraken/k2_mtdna
+Samplesheet: test/test_samplesheet.csv
+Subsample size: 100000
+Output: kraken2_comparison
+Started: Fri Jan 23 16:15:42 CET 2026
+
+=== Processing samples ===
+
+--- Processing: BB1523 (Callithrix geoffroyi) ---
+Subsampling to 100000 reads...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Running Kraken2 with full database...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Loading database information... done.
+100000 sequences (15.10 Mbp) processed in 7908.372s (0.8 Kseq/m, 0.11 Mbp/m).
+  91347 sequences classified (91.35%)
+  8653 sequences unclassified (8.65%)
+Running Kraken2 with mtDNA database...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Loading database information... done.
+100000 sequences (15.10 Mbp) processed in 0.514s (11682.6 Kseq/m, 1764.07 Mbp/m).
+  637 sequences classified (0.64%)
+  99363 sequences unclassified (99.36%)
+Done with BB1523
+
+--- Processing: BB1525 (Gorilla gorilla) ---
+Subsampling to 100000 reads...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Running Kraken2 with full database...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Loading database information... done.
+100000 sequences (15.10 Mbp) processed in 7538.442s (0.8 Kseq/m, 0.12 Mbp/m).
+  98842 sequences classified (98.84%)
+  1158 sequences unclassified (1.16%)
+Running Kraken2 with mtDNA database...
+INFO:    Environment variable SINGULARITY_CACHEDIR is set, but APPTAINER_CACHEDIR is preferred
+Loading database information... done.
+100000 sequences (15.10 Mbp) processed in 0.594s (10106.8 Kseq/m, 1526.13 Mbp/m).
+  701 sequences classified (0.70%)
+  99299 sequences unclassified (99.30%)
+Done with BB1525
+
+=== Generating comparison report ===
+========================================================================================================================
+KRAKEN2 DATABASE COMPARISON REPORT
+========================================================================================================================
+
+Sample               Full DB                                  mtDNA DB                                 Match     
+                     % Class  % Top    Species                  % mtDNA  % Top    Species                  Sp/Gen    
+------------------------------------------------------------------------------------------------------------------------
+BB1523                91.35%   42.48%  Callithrix jacchus         0.64%    0.12%  Callithrix geoffroyi     NO/YES
+BB1525                98.84%   27.83%  Gorilla gorilla            0.70%    0.52%  Gorilla gorilla          YES/YES
+
+========================================================================================================================
+SUMMARY
+========================================================================================================================
+Total samples:        2
+Species match:        1/2 (50.0%)
+Genus match:          2/2 (100.0%)
+Avg % mtDNA reads:    0.67%
+
+Results saved to: kraken2_comparison/comparison_results.csv
+Detailed report saved to: kraken2_comparison/comparison_report.txt
+
+=== Comparison complete ===
+Finished: Fri Jan 23 20:35:00 CET 2026
+
+Output files:
+  - kraken2_comparison/comparison_results.csv
+  - kraken2_comparison/comparison_report.txt
+  - kraken2_comparison/full_db/*.kraken2.report.txt
+  - kraken2_comparison/mtdna_db/*.kraken2.report.txt

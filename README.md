@@ -9,15 +9,22 @@ This pipeline performs quality control, contamination screening, and taxonomic c
 **Key analyses:**
 - **FastQC** - Sequence quality metrics (per-base quality, GC content, adapter detection)
 - **FastQ Screen** - Multi-genome contamination screening
-- **Kraken2** - Taxonomic classification
+- **Kraken2** - Taxonomic classification against a custom mtDNA database
+- **Sex determination** - Inferred sex from marker read mapping
+- **SortMeRNA** - rRNA quantification (% rRNA in subsampled reads)
+- **RiboDetector** - Deep-learning rRNA detection (% rRNA in subsampled reads)
+- **Kraken2 (rRNA)** - Species ID from rRNA reads classified against SILVA SSU database
 - **MultiQC** - Aggregated interactive report
+- **Consolidated summary table** - `qc_summary.tsv` with all key metrics per sample
 
 ## Requirements
 
 - Nextflow ≥23.04.0
 - Singularity or Docker
 - FastQ Screen configuration file and genome database (if using FastQ Screen)
-- Kraken2 database (if using Kraken2)
+- Kraken2 database (if using Kraken2 mtDNA classification)
+- SortMeRNA rRNA FASTA database directory (if using SortMeRNA)
+- SILVA SSU Kraken2 database (if using rRNA-based species ID; download from [Langmead pre-built indexes](https://benlangmead.github.io/aws-indexes/k2))
 
 ## Quick Start
 
@@ -70,8 +77,14 @@ sample2,/path/to/sample2_R1.fastq.gz,,SampleB,Mus musculus
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--fastq_screen_conf` | - | FastQ Screen configuration file |
-| `--kraken2_db` | - | Kraken2 database path |
-| `--kraken2_subsample` | 5000000 | Number of reads to subsample for Kraken2 |
+| `--kraken2_db` | - | Kraken2 mtDNA database path |
+| `--kraken2_subsample` | 5000000 | Reads to subsample for Kraken2 |
+| `--sex_markers_db` | - | Sex marker FASTA for sex determination |
+| `--sortmerna_db` | - | Directory of rRNA FASTA files for SortMeRNA |
+| `--sortmerna_index` | - | Pre-built SortMeRNA index dir (skips rebuild) |
+| `--rrna_subsample` | 1000000 | Reads to subsample for rRNA tools |
+| `--read_length` | 150 | Read length in bp (for RiboDetector) |
+| `--rrna_kraken2_db` | - | SILVA SSU Kraken2 database for rRNA species ID |
 | `--project_name` | - | Project name for MultiQC header |
 | `--application` | - | Application type for MultiQC header |
 
@@ -81,7 +94,11 @@ sample2,/path/to/sample2_R1.fastq.gz,,SampleB,Mus musculus
 |-----------|-------------|
 | `--skip_fastqc` | Skip FastQC analysis |
 | `--skip_fastq_screen` | Skip FastQ Screen |
-| `--skip_kraken2` | Skip Kraken2 classification |
+| `--skip_kraken2` | Skip Kraken2 mtDNA classification |
+| `--skip_sex_determination` | Skip sex determination |
+| `--skip_sortmerna` | Skip SortMeRNA rRNA quantification |
+| `--skip_ribodetector` | Skip RiboDetector rRNA quantification |
+| `--skip_rrna_kraken2` | Skip rRNA-based Kraken2 species ID |
 
 ## Output
 
@@ -89,11 +106,30 @@ sample2,/path/to/sample2_R1.fastq.gz,,SampleB,Mus musculus
 results/
 ├── fastqc/           # FastQC reports (HTML + ZIP)
 ├── fastq_screen/     # FastQ Screen reports
-├── kraken2/          # Kraken2 taxonomy reports
+├── kraken2/          # Kraken2 mtDNA taxonomy reports
+├── kraken2_rrna/     # Kraken2 SILVA SSU reports (rRNA species ID)
+├── sortmerna/        # SortMeRNA logs (+ rRNA reads if --rrna_kraken2_db set)
+├── sex_determination/# Sex determination results
+├── summary/
+│   └── qc_summary.tsv  # Consolidated metrics for all samples
 ├── multiqc/
 │   └── basicqc_multiqc_report.html  # Main report
 └── pipeline_info/    # Execution reports
 ```
+
+### Summary table columns
+
+`qc_summary.tsv` contains (columns added conditionally based on which modules ran):
+
+| Column | Source |
+|--------|--------|
+| `sample_name`, `expected_species` | Samplesheet |
+| `total_reads`, `read_length`, `percent_gc`, `percent_duplicates` | FastQC |
+| `percent_mtdna`, `top_genus`, `percent_top_genus`, `top_species`, `percent_top_species` | Kraken2 mtDNA |
+| `inferred_sex`, `sex_confidence` | Sex determination |
+| `sortmerna_pct_rrna` | SortMeRNA |
+| `ribodetector_pct_rrna` | RiboDetector |
+| `rrna_top_species`, `rrna_pct_top_species` | Kraken2 rRNA (SILVA SSU) |
 
 ## Profiles
 
@@ -154,7 +190,10 @@ nextflow run main.nf \
 |---------|------|--------|------|
 | FastQC | 4 | 4 GB | 4h |
 | FastQ Screen | 8 | 16 GB | 8h |
-| Kraken2 | 8 | 64 GB | 12h |
+| Kraken2 (mtDNA) | 8 | 32 GB | 4h |
+| Kraken2 (rRNA/SILVA) | 8 | 32 GB | 4h |
+| SortMeRNA | 8 | 16 GB | 4h |
+| RiboDetector | 8 | 32 GB | 4h |
 | MultiQC | 2 | 8 GB | 2h |
 
 ## Running on SLURM
@@ -175,17 +214,13 @@ sbatch submit_pipeline.sh inputs/CGLZOO_01.csv results/CGLZOO_01 CGLZOO_01
 Use `test/submit_tests.sh` to run test pipelines:
 
 ```bash
-# Full pipeline test
-sbatch test/submit_tests.sh --full
-
-# FastQC only test
-sbatch test/submit_tests.sh --fastqc_only
-
-# Kraken2 only test
-sbatch test/submit_tests.sh --kraken-only
-
-# Fresh Kraken2 test (no resume)
-sbatch test/submit_tests.sh --kraken-fresh
+sbatch test/submit_tests.sh --full          # Full pipeline
+sbatch test/submit_tests.sh --fastqc_only   # FastQC only
+sbatch test/submit_tests.sh --kraken-only   # Kraken2 mtDNA only
+sbatch test/submit_tests.sh --kraken-fresh  # Kraken2 no resume
+sbatch test/submit_tests.sh --sortmerna     # SortMeRNA rRNA
+sbatch test/submit_tests.sh --sex           # Sex determination
+sbatch test/submit_tests.sh --rrna_kraken2  # rRNA Kraken2 (SILVA SSU)
 ```
 
 ## License

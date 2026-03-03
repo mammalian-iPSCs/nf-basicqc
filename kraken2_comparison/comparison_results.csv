@@ -1,0 +1,3 @@
+sample,full_pct_classified,full_top_species,full_top_pct,mtdna_pct_classified,mtdna_top_species,mtdna_top_pct,species_match,genus_match
+BB1523,91.35,Callithrix jacchus,42.48,0.6400000000000006,Callithrix geoffroyi,0.12,NO,YES
+BB1525,98.84,Gorilla gorilla,27.83,0.7000000000000028,Gorilla gorilla,0.52,YES,YES

@@ -1,0 +1,37 @@
+ Command:
+    /opt/conda/bin/sortmerna --ref /scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta --reads /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/subsampled/HFYMJDSXC_1_8bp-UDP0034_1.fastq.gz --reads /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/subsampled/HFYMJDSXC_1_8bp-UDP0034_2.fastq.gz --threads 8 --workdir /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/smr_v4.3_default_db/HFYMJDSXC_1_8bp-UDP0034_workdir --fastx --aligned /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/smr_v4.3_default_db/HFYMJDSXC_1_8bp-UDP0034_workdir/rRNA_reads --paired_in --out2 
+
+ Process pid = 
+
+ Parameters summary: 
+    Reference file: /scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta
+        Seed length = 18
+        Pass 1 = 18, Pass 2 = 9, Pass 3 = 3
+        Gumbel lambda = 0.609384
+        Gumbel K = 0.337068
+        Minimal SW score based on E-value = 56
+    Number of seeds = 2
+    Edges = 4
+    SW match = 2
+    SW mismatch = -3
+    SW gap open penalty = 5
+    SW gap extend penalty = 2
+    SW ambiguous nucleotide = -3
+    SQ tags are not output
+    Number of alignment processing threads = 8
+    Reads file: /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/subsampled/HFYMJDSXC_1_8bp-UDP0034_1.fastq.gz
+    Reads file: /scratch_isilon/groups/compgen/lwange/nf-basicqc/ribodetector_test/sortmerna_per_db/subsampled/HFYMJDSXC_1_8bp-UDP0034_2.fastq.gz
+    Total reads = 200000
+
+ Results:
+    Total reads passing E-value threshold = 32813 (16.41)
+    Total reads failing E-value threshold = 167187 (83.59)
+    Minimum read length = 151
+    Maximum read length = 151
+    Mean read length    = 151
+
+ Coverage by database:
+    /scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta		16.41
+
+ Tue Mar  3 14:57:06 2026
+

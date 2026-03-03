@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=kraken2_compare
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=250G
-#SBATCH --qos=medium
+#SBATCH --mem=350G
 #SBATCH --time=8:00:00
 #SBATCH --output=kraken2_compare_%j.log
 
@@ -18,8 +17,9 @@ OUTDIR="${1:-kraken2_comparison}"
 SAMPLESHEET="${2:-test_samplesheet.csv}"
 SUBSAMPLE_SIZE="${3:-100000}"
 
-# Singularity
+# Singularity containers
 KRAKEN_CONTAINER="https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/0f/0f827dcea51be6b5c32255167caa2dfb65607caecdc8b067abd6b71c267e2e82/data"
+SEQTK_CONTAINER="https://depot.galaxyproject.org/singularity/seqtk:1.4--he4a0461_2"
 SINGULARITY_CACHE="/scratch_isilon/groups/compgen/lwange/singularity/basicqc"
 
 module load singularity 2>/dev/null || true
@@ -27,6 +27,10 @@ export SINGULARITY_CACHEDIR="${SINGULARITY_CACHE}"
 
 run_kraken2() {
     singularity exec --bind /scratch_isilon "${KRAKEN_CONTAINER}" "$@"
+}
+
+run_seqtk() {
+    singularity exec --bind /scratch_isilon "${SEQTK_CONTAINER}" "$@"
 }
 
 echo "=== Kraken2 Database Comparison ==="
@@ -70,11 +74,9 @@ tail -n +2 "${SAMPLESHEET}" | while IFS=',' read -r sample fastq_1 fastq_2 sampl
 
     if [[ -n "$fastq_2" && -f "$fastq_2" ]]; then
         # Paired-end: subsample R1 only for simplicity
-        singularity exec --bind /scratch_isilon "${KRAKEN_CONTAINER}" \
-            seqtk sample -s42 "${fastq_1}" "${SUBSAMPLE_SIZE}" | gzip > "${subsampled}"
+        run_seqtk seqtk sample -s42 "${fastq_1}" "${SUBSAMPLE_SIZE}" | gzip > "${subsampled}"
     else
-        singularity exec --bind /scratch_isilon "${KRAKEN_CONTAINER}" \
-            seqtk sample -s42 "${fastq_1}" "${SUBSAMPLE_SIZE}" | gzip > "${subsampled}"
+        run_seqtk seqtk sample -s42 "${fastq_1}" "${SUBSAMPLE_SIZE}" | gzip > "${subsampled}"
     fi
 
     # Run Kraken2 with full database

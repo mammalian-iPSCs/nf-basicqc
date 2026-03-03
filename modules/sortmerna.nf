@@ -61,12 +61,14 @@ process SORTMERNA {
 
     input:
     tuple val(sample), path(reads)
-    path(fastas)   // collected list of rRNA database FASTA files
-    path(index)    // pre-built index directory
+    path(fastas)        // collected list of rRNA database FASTA files
+    path(index)         // pre-built index directory
+    val(save_rrna)      // whether to save rRNA reads for downstream classification
 
     output:
-    tuple val(sample), path("*.sortmerna.log"), emit: log
-    path "versions.yml"                        , emit: versions
+    tuple val(sample), path("*.sortmerna.log"),              emit: log
+    tuple val(sample), path("*_rrna*.fastq.gz"), optional: true, emit: rrna_reads
+    path "versions.yml"                                    , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -96,8 +98,17 @@ process SORTMERNA {
 
     mv rRNA_reads.log ${prefix}.sortmerna.log
 
-    # Clean up read files — only the log is needed for QC
-    rm -f rRNA_reads*.fastq.gz rRNA_reads*.fq.gz
+    # Optionally save rRNA reads for downstream classification
+    if [[ "${save_rrna}" == "true" ]]; then
+        if [[ "${paired}" == "true" ]]; then
+            mv rRNA_reads_fwd.fastq.gz ${prefix}_rrna_1.fastq.gz
+            mv rRNA_reads_rev.fastq.gz ${prefix}_rrna_2.fastq.gz
+        else
+            mv rRNA_reads.fastq.gz ${prefix}_rrna.fastq.gz
+        fi
+    else
+        rm -f rRNA_reads*.fastq.gz rRNA_reads*.fq.gz
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

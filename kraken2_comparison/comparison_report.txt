@@ -1,0 +1,25 @@
+KRAKEN2 DATABASE COMPARISON REPORT
+================================================================================
+
+Sample: BB1523
+----------------------------------------
+  Full Database:
+    % Classified:  91.35%
+    Top Species:   Callithrix jacchus (42.48%)
+  mtDNA Database:
+    % mtDNA:       0.64%
+    Top Species:   Callithrix geoffroyi (0.12%)
+  Species Match:   NO
+  Genus Match:     YES
+
+Sample: BB1525
+----------------------------------------
+  Full Database:
+    % Classified:  98.84%
+    Top Species:   Gorilla gorilla (27.83%)
+  mtDNA Database:
+    % mtDNA:       0.70%
+    Top Species:   Gorilla gorilla (0.52%)
+  Species Match:   YES
+  Genus Match:     YES
+

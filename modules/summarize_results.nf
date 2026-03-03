@@ -16,21 +16,23 @@ process SUMMARIZE_RESULTS {
     publishDir "${params.outdir}/summary", mode: 'copy'
 
     input:
-    path(fastqc_data)       // FastQC zip files
-    path(kraken2_summary)   // kraken2_top_species_mqc.txt
-    path(sex_summary)       // sex_determination_mqc.txt (or NO_SEX)
-    path(sortmerna_logs)    // *.sortmerna.log files (or NO_SORTMERNA)
-    path(ribodetector_logs) // *.ribodetector.log files (or NO_RIBODETECTOR)
-    val(sample_info)        // List of maps with: sample_name, species
+    path(fastqc_data)          // FastQC zip files
+    path(kraken2_summary)      // kraken2_top_species_mqc.txt
+    path(sex_summary)          // sex_determination_mqc.txt (or NO_SEX)
+    path(sortmerna_logs)       // *.sortmerna.log files (or NO_SORTMERNA)
+    path(ribodetector_logs)    // *.ribodetector.log files (or NO_RIBODETECTOR)
+    path(rrna_kraken2_reports) // *_rrna.kraken2.report.txt files (or NO_RRNA_KRAKEN2)
+    val(sample_info)           // List of maps with: sample_name, species
 
     output:
     path("qc_summary.tsv"), emit: summary
 
     script:
-    def has_sex          = sex_summary.name          != 'NO_SEX'          ? 'True' : 'False'
-    def has_sortmerna    = sortmerna_logs.name        != 'NO_SORTMERNA'    ? 'True' : 'False'
-    def has_ribodetector = ribodetector_logs.name     != 'NO_RIBODETECTOR' ? 'True' : 'False'
-    def sample_info_json = groovy.json.JsonOutput.toJson(sample_info)
+    def has_sex           = sex_summary.name           != 'NO_SEX'           ? 'True' : 'False'
+    def has_sortmerna     = sortmerna_logs.name         != 'NO_SORTMERNA'    ? 'True' : 'False'
+    def has_ribodetector  = ribodetector_logs.name      != 'NO_RIBODETECTOR' ? 'True' : 'False'
+    def has_rrna_kraken2  = rrna_kraken2_reports.name   != 'NO_RRNA_KRAKEN2' ? 'True' : 'False'
+    def sample_info_json  = groovy.json.JsonOutput.toJson(sample_info)
     """
     #!/usr/bin/env python3
     import os
@@ -183,6 +185,34 @@ process SUMMARIZE_RESULTS {
         for sample_name, vals in ribodetector_vals.items():
             data[sample_name]['ribodetector_pct_rrna'] = f"{sum(vals)/len(vals):.2f}"
 
+    # Parse rRNA Kraken2 reports
+    # Report files are named {fli}_rrna.kraken2.report.txt
+    has_rrna_kraken2 = ${has_rrna_kraken2}
+    if has_rrna_kraken2:
+        for report_file in glob.glob("*_rrna.kraken2.report.txt"):
+            fli = report_file.replace("_rrna.kraken2.report.txt", "")
+            sample_name = fli_to_sample.get(fli, fli)
+            unclassified_pct = 0
+            species_rows = []
+            with open(report_file) as f:
+                for line in f:
+                    parts = line.strip().split('\\t')
+                    if len(parts) < 6:
+                        continue
+                    rank = parts[3].strip()
+                    pct = float(parts[0].strip())
+                    name = parts[5].strip()
+                    if rank == 'U':
+                        unclassified_pct = pct
+                    elif rank == 'S':
+                        species_rows.append((pct, name))
+            if species_rows:
+                classified_pct = 100 - unclassified_pct
+                top_pct, top_name = max(species_rows)
+                pct_of_classified = (top_pct / classified_pct * 100) if classified_pct > 0 else 0
+                data[sample_name]['rrna_top_species'] = top_name
+                data[sample_name]['rrna_pct_top_species'] = f"{pct_of_classified:.1f}"
+
     # Write output TSV
     columns = [
         'sample_name', 'expected_species', 'total_reads', 'read_length',
@@ -196,6 +226,8 @@ process SUMMARIZE_RESULTS {
         columns.append('sortmerna_pct_rrna')
     if has_ribodetector:
         columns.append('ribodetector_pct_rrna')
+    if has_rrna_kraken2:
+        columns.extend(['rrna_top_species', 'rrna_pct_top_species'])
 
     with open('qc_summary.tsv', 'w') as f:
         f.write('\\t'.join(columns) + '\\n')
@@ -223,6 +255,11 @@ process SUMMARIZE_RESULTS {
                 row.append(data[sample_name].get('sortmerna_pct_rrna', ''))
             if has_ribodetector:
                 row.append(data[sample_name].get('ribodetector_pct_rrna', ''))
+            if has_rrna_kraken2:
+                row.extend([
+                    data[sample_name].get('rrna_top_species', ''),
+                    data[sample_name].get('rrna_pct_top_species', '')
+                ])
             f.write('\\t'.join(row) + '\\n')
 
     print(f"Generated summary for {len(data)} samples")
