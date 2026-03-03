@@ -322,9 +322,10 @@ workflow {
     // caching avoids rebuilding when inputs haven't changed.
     //
     if (run_sortmerna) {
-        ch_sortmerna_fastas = Channel
-            .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
-            .collect()
+        // --sortmerna_db can be a single FASTA file or a directory of FASTA files
+        ch_sortmerna_fastas = file(params.sortmerna_db).isDirectory()
+            ? Channel.fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}").collect()
+            : Channel.of(file(params.sortmerna_db)).collect()
 
         SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, run_rrna_kraken2.toString())
         ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })

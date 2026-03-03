@@ -26,7 +26,7 @@ SLURM_CONFIG="/home/groups/compgen/lwange/isilon/lwange/singularity/basicqc/slur
 FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/FastQ_Screen_Genomes/FastQ_Screen_Genomes/fastq_screen.conf"
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/sex_markers/all_sex_markers.fasta"
-SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices"
+SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta"
 SILVA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_silva_ssu"
 
 # Project metadata for MultiQC report
