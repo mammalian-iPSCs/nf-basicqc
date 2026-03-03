@@ -24,7 +24,6 @@ include { KRAKEN2 as KRAKEN2_RRNA                         } from './modules/krak
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
-include { SORTMERNA_INDEX                                 } from './modules/sortmerna'
 include { SORTMERNA                                       } from './modules/sortmerna'
 include { RIBODETECTOR                                    } from './modules/ribodetector'
 include { MULTIQC                                         } from './modules/multiqc'
@@ -55,6 +54,7 @@ def helpMessage() {
       --kraken2_subsample   Number of reads to subsample for Kraken2 (default: 5000000)
       --sex_markers_db      Path to sex marker FASTA for sex determination
       --sortmerna_db        Path to directory containing rRNA FASTA database files
+      --rrna_kraken2_db     Path to SILVA SSU Kraken2 database for rRNA-based species ID
       --rrna_subsample      Number of reads to subsample for rRNA tools (default: 1000000)
       --read_length         Sequenced read length in bp for RiboDetector (default: 150)
       --skip_fastqc         Skip FastQC step
@@ -304,7 +304,7 @@ workflow {
     // rRNA quantification: SortMeRNA and/or RiboDetector
     // Subsampled reads are shared between both tools when both are enabled.
     //
-    def run_sortmerna    = !params.skip_sortmerna && (params.sortmerna_db || params.sortmerna_index)
+    def run_sortmerna    = !params.skip_sortmerna && params.sortmerna_db
     def run_ribodetector = !params.skip_ribodetector
     def run_rrna_kraken2 = !params.skip_rrna_kraken2 && params.rrna_kraken2_db && run_sortmerna
 
@@ -316,26 +316,17 @@ workflow {
 
     //
     // MODULE: SortMeRNA
+    // Each job builds its own index in its work directory (--index 1).
+    // SortMeRNA hashes index files by reference file PATH, so a shared pre-built
+    // index cannot be reused across Nextflow work directories. Nextflow's -resume
+    // caching avoids rebuilding when inputs haven't changed.
     //
     if (run_sortmerna) {
-        // Locate rRNA FASTA files: use --sortmerna_db if provided, otherwise infer
-        // from the parent directory of --sortmerna_index (index lives in <db>/idx/).
-        def sortmerna_fasta_dir = params.sortmerna_db ?: file(params.sortmerna_index).parent
         ch_sortmerna_fastas = Channel
-            .fromPath("${sortmerna_fasta_dir}/*.{fasta,fa,fna}")
+            .fromPath("${params.sortmerna_db}/*.{fasta,fa,fna}")
             .collect()
 
-        // Build index once or reuse a pre-built one.
-        // On first run the index is published to <outdir>/sortmerna/idx —
-        // pass it as --sortmerna_index on subsequent runs to skip rebuilding.
-        if (params.sortmerna_index) {
-            ch_sortmerna_index = Channel.value(file(params.sortmerna_index))
-        } else {
-            SORTMERNA_INDEX(ch_sortmerna_fastas)
-            ch_sortmerna_index = SORTMERNA_INDEX.out.index
-        }
-
-        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index, run_rrna_kraken2.toString())
+        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, run_rrna_kraken2.toString())
         ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
 
         if (run_rrna_kraken2) {
@@ -348,7 +339,7 @@ workflow {
             )
         }
     } else if (!params.skip_sortmerna) {
-        log.warn "No SortMeRNA database (--sortmerna_db) or index (--sortmerna_index) provided. Skipping SortMeRNA."
+        log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping SortMeRNA."
     }
 
     //

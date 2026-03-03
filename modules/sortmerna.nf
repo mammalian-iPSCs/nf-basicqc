@@ -6,53 +6,12 @@
     Adapted from nf-core/modules sortmerna module (v4.3.7)
     Used here for rRNA quantification only (log output for MultiQC, reads not saved)
 
-    Two processes:
-      SORTMERNA_INDEX  — builds the index once from FASTA files; index is saved to
-                         outdir and can be reused across runs via --sortmerna_index
-      SORTMERNA        — runs per-sample classification using the pre-built index
+    Note: SortMeRNA computes index file names from a hash of the reference file PATH,
+    not its content. This means a pre-built index cannot be reused across different
+    work directories (where staged FASTAs have different paths). Therefore each SORTMERNA
+    job builds its own index in its work directory (--index 1). Nextflow's caching
+    (-resume) avoids rebuilding on subsequent runs with the same inputs.
 */
-
-process SORTMERNA_INDEX {
-    tag "build_index"
-    label 'process_high'
-    publishDir "${params.outdir}/sortmerna/idx", mode: 'copy'
-
-    input:
-    path(fastas)
-
-    output:
-    path "idx"         , emit: index
-    path "versions.yml", emit: versions
-
-    when:
-    task.ext.when == null || task.ext.when
-
-    script:
-    def fasta_list = fastas instanceof List ? fastas : [fastas]
-    def refs_cmd   = fasta_list.collect { "--ref $it" }.join(' ')
-    """
-    sortmerna \\
-        ${refs_cmd} \\
-        --workdir . \\
-        --index 1
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        sortmerna: \$(sortmerna --version 2>&1 | grep -oE "[0-9]+\\.[0-9]+\\.[0-9]+" | head -1)
-    END_VERSIONS
-    """
-
-    stub:
-    """
-    mkdir -p idx
-    touch idx/stub.idx
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        sortmerna: 4.3.7
-    END_VERSIONS
-    """
-}
 
 process SORTMERNA {
     tag "$sample"
@@ -62,7 +21,6 @@ process SORTMERNA {
     input:
     tuple val(sample), path(reads)
     path(fastas)        // collected list of rRNA database FASTA files
-    path(index)         // pre-built index directory
     val(save_rrna)      // whether to save rRNA reads for downstream classification
 
     output:
@@ -90,8 +48,7 @@ process SORTMERNA {
         --workdir . \\
         --fastx \\
         --aligned rRNA_reads \\
-        --idx-dir ${index} \\
-        --index 0 \\
+        --index 1 \\
         ${paired_cmd} \\
         ${out2_cmd} \\
         $args

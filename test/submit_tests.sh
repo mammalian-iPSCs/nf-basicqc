@@ -140,8 +140,7 @@ if [[ "$arg1" == "--sortmerna" ]]; then
         -resume
     echo "$(date) === SortMeRNA test complete ==="
     echo "Check results in: $PIPELINE_DIR/test/results_sortmerna"
-    echo "Index saved to:   $PIPELINE_DIR/test/results_sortmerna/sortmerna/idx"
-    echo "  (reuse with --sortmerna_index to skip rebuilding)"
+    echo "Note: index is built per-job in the Nextflow work dir; use -resume to avoid rebuilding"
     exit 0
 fi
 
