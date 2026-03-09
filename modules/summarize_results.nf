@@ -163,7 +163,7 @@ process SUMMARIZE_RESULTS {
             sample_name = fli_to_sample.get(fli, fli)
             with open(log_file) as f:
                 content = f.read()
-            m = re.search(r'Total reads passing E-value threshold\\s*=\\s*\\d+\\s*\\(([\\d.]+)%\\)', content)
+            m = re.search(r'Total reads passing E-value threshold\\s*=\\s*\\d+\\s*\\(([\\d.]+)%?\\)', content)
             if m:
                 sortmerna_vals[sample_name].append(float(m.group(1)))
         for sample_name, vals in sortmerna_vals.items():
@@ -173,15 +173,20 @@ process SUMMARIZE_RESULTS {
     # Log line: "rRNA sequences: N (X.XX%)"
     has_ribodetector = ${has_ribodetector}
     if has_ribodetector:
+        ansi_re = re.compile(r'\\x1b\\[[0-9;]*[A-Za-z]')
         ribodetector_vals = defaultdict(list)
         for log_file in glob.glob("*.ribodetector.log"):
             fli = log_file.replace(".ribodetector.log", "")
             sample_name = fli_to_sample.get(fli, fli)
             with open(log_file) as f:
-                content = f.read()
-            m = re.search(r'rRNA sequences:\\s*\\d+\\s*\\(([\\d.]+)%\\)', content, re.IGNORECASE)
-            if m:
-                ribodetector_vals[sample_name].append(float(m.group(1)))
+                content = ansi_re.sub('', f.read())
+            m_total = re.search(r'Processed\\s+(\\d+)\\s+sequences in total', content)
+            m_rrna  = re.search(r'Detected\\s+(\\d+)\\s+rRNA sequences', content)
+            if m_total and m_rrna:
+                total = int(m_total.group(1))
+                rrna  = int(m_rrna.group(1))
+                if total > 0:
+                    ribodetector_vals[sample_name].append(rrna / total * 100)
         for sample_name, vals in ribodetector_vals.items():
             data[sample_name]['ribodetector_pct_rrna'] = f"{sum(vals)/len(vals):.2f}"
 
@@ -193,6 +198,7 @@ process SUMMARIZE_RESULTS {
             fli = report_file.replace("_rrna.kraken2.report.txt", "")
             sample_name = fli_to_sample.get(fli, fli)
             unclassified_pct = 0
+            genus_rows = []
             species_rows = []
             with open(report_file) as f:
                 for line in f:
@@ -204,10 +210,17 @@ process SUMMARIZE_RESULTS {
                     name = parts[5].strip()
                     if rank == 'U':
                         unclassified_pct = pct
+                    elif rank == 'G':
+                        genus_rows.append((pct, name))
                     elif rank == 'S':
                         species_rows.append((pct, name))
+            classified_pct = 100 - unclassified_pct
+            if genus_rows:
+                top_pct, top_name = max(genus_rows)
+                pct_of_classified = (top_pct / classified_pct * 100) if classified_pct > 0 else 0
+                data[sample_name]['rrna_top_genus'] = top_name
+                data[sample_name]['rrna_pct_top_genus'] = f"{pct_of_classified:.1f}"
             if species_rows:
-                classified_pct = 100 - unclassified_pct
                 top_pct, top_name = max(species_rows)
                 pct_of_classified = (top_pct / classified_pct * 100) if classified_pct > 0 else 0
                 data[sample_name]['rrna_top_species'] = top_name
@@ -227,7 +240,7 @@ process SUMMARIZE_RESULTS {
     if has_ribodetector:
         columns.append('ribodetector_pct_rrna')
     if has_rrna_kraken2:
-        columns.extend(['rrna_top_species', 'rrna_pct_top_species'])
+        columns.extend(['rrna_top_genus', 'rrna_pct_top_genus', 'rrna_top_species', 'rrna_pct_top_species'])
 
     with open('qc_summary.tsv', 'w') as f:
         f.write('\\t'.join(columns) + '\\n')
@@ -257,6 +270,8 @@ process SUMMARIZE_RESULTS {
                 row.append(data[sample_name].get('ribodetector_pct_rrna', ''))
             if has_rrna_kraken2:
                 row.extend([
+                    data[sample_name].get('rrna_top_genus', ''),
+                    data[sample_name].get('rrna_pct_top_genus', ''),
                     data[sample_name].get('rrna_top_species', ''),
                     data[sample_name].get('rrna_pct_top_species', '')
                 ])

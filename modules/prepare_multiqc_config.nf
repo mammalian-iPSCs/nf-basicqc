@@ -89,7 +89,6 @@ module_order:
     - custom_content
     - fastqc
     - fastq_screen
-    - sortmerna
     - kraken
 
 # Kraken2 plot configuration - show enough species for all samples
@@ -104,10 +103,6 @@ table_columns_visible:
         avg_sequence_length: True
         percent_fails: False
         total_sequences: True
-    SortMeRNA:
-        pct_rRNA: True
-        rRNA: False
-        non_rRNA: False
     "Custom content: kraken2_top_species_mqc":
         percent_classified: True
         top_genus: True
@@ -117,11 +112,15 @@ table_columns_visible:
     "Custom content: sex_determination_mqc":
         inferred_sex: True
         sex_confidence: True
+    "Custom content: rrna_kraken2_species_mqc":
+        rrna_pct_classified: True
+        rrna_top_genus: True
+        rrna_pct_top_genus: True
+        rrna_top_species: True
+        rrna_pct_top_species: True
 
 # Column ordering - put our custom columns first
 table_columns_placement:
-    SortMeRNA:
-        pct_rRNA: 95
     "Custom content: kraken2_top_species_mqc":
         percent_classified: 100
         top_genus: 110
@@ -131,6 +130,12 @@ table_columns_placement:
     "Custom content: sex_determination_mqc":
         inferred_sex: 150
         sex_confidence: 160
+    "Custom content: rrna_kraken2_species_mqc":
+        rrna_pct_classified: 170
+        rrna_top_genus: 180
+        rrna_pct_top_genus: 190
+        rrna_top_species: 200
+        rrna_pct_top_species: 210
 
 # Hide the default Kraken module entirely from general stats
 # We use our custom kraken2_summary_mqc.txt instead

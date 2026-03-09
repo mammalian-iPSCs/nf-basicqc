@@ -27,7 +27,8 @@ FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/sex_markers/all_sex_markers.fasta"
 SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta"
-SILVA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_silva_ssu"
+RRNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_animal_rrna/"
+
 
 # Project metadata for MultiQC report
 PROJECT_NAME="CGLZOO_01"
@@ -43,6 +44,9 @@ echo "========================================="
 # module load singularity
 
 arg1="${1:---full}"
+# Run name prefix: test_<type>_MMDDHHMI  (unique per launch)
+RUN_TS=$(date +%m%d%H%M)
+TEST_TYPE="${arg1#--}"  # strip leading --
 
 # fastqc only pipeline test only
 if [[ "$arg1" == "--fastqc_only" ]]; then
@@ -54,6 +58,7 @@ if [[ "$arg1" == "--fastqc_only" ]]; then
         --skip_kraken2 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
         -resume
     echo "$(date) === FASTQC test complete ==="
@@ -73,6 +78,7 @@ if [[ "$arg1" == "--kraken-only" ]]; then
         --kraken2_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
         -resume
     echo "$(date) === Kraken2 test complete ==="
@@ -95,6 +101,7 @@ if [[ "$arg1" == "--kraken-fresh" ]]; then
         --kraken2_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG
     echo "$(date) === Kraken2 test complete ==="
     echo "Check results in: $PIPELINE_DIR/test/results_kraken2"
@@ -115,8 +122,9 @@ if [[ "$arg1" == "--full" ]]; then
         --rrna_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
-        -resume
+        -w /scratch_isilon/groups/compgen/lwange/nf-basicqc/test/work
     echo "$(date) === Full pipeline test complete ==="
     echo "Check results in: $PIPELINE_DIR/test/results_full"
     exit 0
@@ -136,6 +144,7 @@ if [[ "$arg1" == "--sortmerna" ]]; then
         --rrna_subsample 100000 \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
         -resume
     echo "$(date) === SortMeRNA test complete ==="
@@ -155,9 +164,11 @@ if [[ "$arg1" == "--rrna_kraken2" ]]; then
         --skip_kraken2 \
         --skip_sex_determination \
         --sortmerna_db $SORTMERNA_DB \
-        --rrna_subsample 100000 \
-        --rrna_kraken2_db $SILVA_DB \
+        --rrna_subsample 1000000 \
+        --rrna_kraken2_db $RRNA_DB \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
+        -w /scratch_isilon/groups/compgen/lwange/nf-basicqc/test/work \
         -resume
     echo "$(date) === rRNA Kraken2 test complete ==="
     echo "Check results in: $PIPELINE_DIR/test/results_rrna_kraken2"
@@ -177,6 +188,7 @@ if [[ "$arg1" == "--sex" ]]; then
         --sex_markers_db $SEX_MARKERS_DB \
         --project_name $PROJECT_NAME \
         --application $APPLICATION \
+        -name "test_${TEST_TYPE}_${RUN_TS}" \
         -profile singularity -c $SLURM_CONFIG \
         -resume
     echo "$(date) === Sex determination test complete ==="

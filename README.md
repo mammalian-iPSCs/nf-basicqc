@@ -13,7 +13,7 @@ This pipeline performs quality control, contamination screening, and taxonomic c
 - **Sex determination** - Inferred sex from marker read mapping
 - **SortMeRNA** - rRNA quantification (% rRNA in subsampled reads)
 - **RiboDetector** - Deep-learning rRNA detection (% rRNA in subsampled reads)
-- **Kraken2 (rRNA)** - Species ID from rRNA reads classified against SILVA SSU database
+- **Kraken2 (rRNA)** - Species ID from RiboDetector-extracted rRNA reads classified against a custom animal rRNA database (16S/18S/28S Metazoa)
 - **MultiQC** - Aggregated interactive report
 - **Consolidated summary table** - `qc_summary.tsv` with all key metrics per sample
 
@@ -24,7 +24,7 @@ This pipeline performs quality control, contamination screening, and taxonomic c
 - FastQ Screen configuration file and genome database (if using FastQ Screen)
 - Kraken2 database (if using Kraken2 mtDNA classification)
 - SortMeRNA rRNA FASTA database directory (if using SortMeRNA)
-- SILVA SSU Kraken2 database (if using rRNA-based species ID; download from [Langmead pre-built indexes](https://benlangmead.github.io/aws-indexes/k2))
+- Custom animal rRNA Kraken2 database (if using rRNA-based species ID; build with `build_animal_rrna_db.sh`)
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ sample2,/path/to/sample2_R1.fastq.gz,,SampleB,Mus musculus
 | `--sortmerna_index` | - | Pre-built SortMeRNA index dir (skips rebuild) |
 | `--rrna_subsample` | 1000000 | Reads to subsample for rRNA tools |
 | `--read_length` | 150 | Read length in bp (for RiboDetector) |
-| `--rrna_kraken2_db` | - | SILVA SSU Kraken2 database for rRNA species ID |
+| `--rrna_kraken2_db` | - | Kraken2 database for rRNA species ID (uses RiboDetector-extracted reads) |
 | `--project_name` | - | Project name for MultiQC header |
 | `--application` | - | Application type for MultiQC header |
 
@@ -108,7 +108,8 @@ results/
 ├── fastq_screen/     # FastQ Screen reports
 ├── kraken2/          # Kraken2 mtDNA taxonomy reports
 ├── kraken2_rrna/     # Kraken2 SILVA SSU reports (rRNA species ID)
-├── sortmerna/        # SortMeRNA logs (+ rRNA reads if --rrna_kraken2_db set)
+├── sortmerna/        # SortMeRNA logs (% rRNA metric only)
+├── ribodetector/     # RiboDetector logs (+ rRNA reads if --rrna_kraken2_db set)
 ├── sex_determination/# Sex determination results
 ├── summary/
 │   └── qc_summary.tsv  # Consolidated metrics for all samples
@@ -129,7 +130,7 @@ results/
 | `inferred_sex`, `sex_confidence` | Sex determination |
 | `sortmerna_pct_rrna` | SortMeRNA |
 | `ribodetector_pct_rrna` | RiboDetector |
-| `rrna_top_species`, `rrna_pct_top_species` | Kraken2 rRNA (SILVA SSU) |
+| `rrna_top_genus`, `rrna_pct_top_genus`, `rrna_top_species`, `rrna_pct_top_species` | Kraken2 rRNA |
 
 ## Profiles
 

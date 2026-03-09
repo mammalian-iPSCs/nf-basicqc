@@ -4,7 +4,8 @@
 ========================================================================================
     SortMeRNA - Tool for filtering ribosomal RNA from sequencing reads
     Adapted from nf-core/modules sortmerna module (v4.3.7)
-    Used here for rRNA quantification only (log output for MultiQC, reads not saved)
+    Used here for rRNA quantification (log output) and optionally to save rRNA reads
+    for downstream Kraken2 classification (when save_rrna is true).
 
     Two processes:
       SORTMERNA_INDEX  — builds the index once per run from FASTA files; the output
@@ -106,10 +107,10 @@ process SORTMERNA {
     # Optionally save rRNA reads for downstream classification
     if [[ "${save_rrna}" == "true" ]]; then
         if [[ "${paired}" == "true" ]]; then
-            mv rRNA_reads_fwd.fastq.gz ${prefix}_rrna_1.fastq.gz
-            mv rRNA_reads_rev.fastq.gz ${prefix}_rrna_2.fastq.gz
+            mv rRNA_reads_fwd.f*.gz ${prefix}_rrna_1.fastq.gz
+            mv rRNA_reads_rev.f*.gz ${prefix}_rrna_2.fastq.gz
         else
-            mv rRNA_reads.fastq.gz ${prefix}_rrna.fastq.gz
+            mv rRNA_reads.f*.gz ${prefix}_rrna.fastq.gz
         fi
     else
         rm -f rRNA_reads*.fastq.gz rRNA_reads*.fq.gz

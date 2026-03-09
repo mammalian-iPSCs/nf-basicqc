@@ -22,11 +22,13 @@ include { SEQTK_SUBSAMPLE as SEQTK_SUBSAMPLE_RRNA         } from './modules/seqt
 include { KRAKEN2                                         } from './modules/kraken2'
 include { KRAKEN2 as KRAKEN2_RRNA                         } from './modules/kraken2'
 include { SUMMARIZE_KRAKEN2                               } from './modules/summarize_kraken2'
+include { SUMMARIZE_RRNA_KRAKEN2                          } from './modules/summarize_kraken2'
 include { SEX_DETERMINATION                               } from './modules/sex_determination'
 include { SUMMARIZE_SEX                                   } from './modules/sex_determination'
 include { SORTMERNA_INDEX                                 } from './modules/sortmerna'
 include { SORTMERNA                                       } from './modules/sortmerna'
 include { RIBODETECTOR                                    } from './modules/ribodetector'
+include { SUMMARIZE_RRNA                                  } from './modules/summarize_rrna'
 include { MULTIQC                                         } from './modules/multiqc'
 include { PREPARE_MULTIQC_CONFIG                          } from './modules/prepare_multiqc_config'
 include { SUMMARIZE_RESULTS                               } from './modules/summarize_results'
@@ -307,7 +309,7 @@ workflow {
     //
     def run_sortmerna    = !params.skip_sortmerna && params.sortmerna_db
     def run_ribodetector = !params.skip_ribodetector
-    def run_rrna_kraken2 = !params.skip_rrna_kraken2 && params.rrna_kraken2_db && run_sortmerna
+    def run_rrna_kraken2 = !params.skip_rrna_kraken2 && params.rrna_kraken2_db && run_ribodetector
 
     if (run_sortmerna || run_ribodetector) {
         // Subsample once, shared by both tools
@@ -332,28 +334,47 @@ workflow {
         SORTMERNA_INDEX(ch_sortmerna_fastas)
         ch_sortmerna_index = SORTMERNA_INDEX.out.index.first()
 
-        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index, run_rrna_kraken2.toString())
-        ch_multiqc_files = ch_multiqc_files.mix(SORTMERNA.out.log.map { it[1] })
-
-        if (run_rrna_kraken2) {
-            ch_rrna_kraken2_db = file(params.rrna_kraken2_db)
-            // Rename sample ID to add _rrna suffix → output files become {fli}_rrna.kraken2.report.txt
-            // This distinguishes them from mtDNA Kraken2 reports in the SUMMARIZE_RESULTS work dir
-            KRAKEN2_RRNA(
-                SORTMERNA.out.rrna_reads.map { sample, reads -> tuple("${sample}_rrna", reads) },
-                ch_rrna_kraken2_db
-            )
-        }
+        // SortMeRNA is used for % rRNA metric only — reads are no longer passed to Kraken2
+        SORTMERNA(ch_rrna_reads, ch_sortmerna_fastas, ch_sortmerna_index, 'false')
     } else if (!params.skip_sortmerna) {
         log.warn "No SortMeRNA database provided (--sortmerna_db). Skipping SortMeRNA."
     }
 
     //
     // MODULE: RiboDetector
+    // Provides % rRNA metric and, when run_rrna_kraken2 is enabled, saves rRNA reads
+    // for downstream Kraken2 classification (fewer mRNA false positives than SortMeRNA).
     //
     if (run_ribodetector) {
-        RIBODETECTOR(ch_rrna_reads, params.read_length)
-        ch_multiqc_files = ch_multiqc_files.mix(RIBODETECTOR.out.log.map { it[1] })
+        RIBODETECTOR(ch_rrna_reads, params.read_length, run_rrna_kraken2.toString())
+
+        if (run_rrna_kraken2) {
+            ch_rrna_kraken2_db = file(params.rrna_kraken2_db)
+            // Rename sample ID to add _rrna suffix → output files become {fli}_rrna.kraken2.report.txt
+            // This distinguishes them from mtDNA Kraken2 reports in the SUMMARIZE_RESULTS work dir
+            KRAKEN2_RRNA(
+                RIBODETECTOR.out.rrna_reads.map { sample, reads -> tuple("${sample}_rrna", reads) },
+                ch_rrna_kraken2_db
+            )
+            // Summarize rRNA Kraken2 for MultiQC (custom content table, same style as mtDNA Kraken2)
+            SUMMARIZE_RRNA_KRAKEN2(
+                KRAKEN2_RRNA.out.report.map { it[1] }.collect(),
+                ch_sample_metadata
+            )
+            ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE_RRNA_KRAKEN2.out.summary)
+        }
+    }
+
+    //
+    // MODULE: Summarize rRNA quantification for MultiQC (proper per-sample naming)
+    // Creates generalstats custom content with FLI → sample_name mapping, replacing
+    // the raw SortMeRNA logs that MultiQC would parse with per-read-file sample names.
+    //
+    if (run_sortmerna || run_ribodetector) {
+        ch_smr_logs  = run_sortmerna    ? SORTMERNA.out.log.map    { it[1] }.collect() : Channel.of(file("NO_SORTMERNA"))
+        ch_ribo_logs = run_ribodetector ? RIBODETECTOR.out.log.map { it[1] }.collect() : Channel.of(file("NO_RIBODETECTOR"))
+        SUMMARIZE_RRNA(ch_smr_logs, ch_ribo_logs, ch_sample_metadata)
+        ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE_RRNA.out.summary)
     }
 
     //

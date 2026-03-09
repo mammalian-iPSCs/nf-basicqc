@@ -48,12 +48,17 @@ SLURM_CONFIG="/home/groups/compgen/lwange/isilon/lwange/singularity/basicqc/slur
 FASTQ_SCREEN_CONF="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/FastQ_Screen_Genomes/FastQ_Screen_Genomes/fastq_screen.conf"
 KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_mtdna"
 SEX_MARKERS_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/sex_markers/all_sex_markers.fasta"
-SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices"
+SORTMERNA_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/rRNA_indices/smr_v4.3_default_db.fasta"
+RRNA_KRAKEN2_DB="/scratch_isilon/groups/compgen/data/Illumina_CryoZoo/genomes/databases/kraken/k2_animal_rrna"
 
 # Create run directory and work from there to avoid lock conflicts
 RUN_DIR="$(dirname $OUTDIR)"
 mkdir -p "$RUN_DIR"
 cd "$RUN_DIR"
+
+# Build a valid Nextflow run name: project_application_MMDDHHMI (unique per launch)
+RUN_BASE=$(echo "${PROJECT_NAME}_${APPLICATION}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g; s/__*/_/g; s/^_//; s/_$//')
+RUN_NAME="${RUN_BASE}_$(date +%m%d%H%M)"
 
 echo "$(date) Starting BasicQC pipeline"
 echo "=================================="
@@ -68,6 +73,7 @@ echo "  FastQ Screen:  $FASTQ_SCREEN_CONF"
 echo "  Kraken2 mtDNA: $KRAKEN2_DB"
 echo "  Sex markers:   $SEX_MARKERS_DB"
 echo "  SortMeRNA:     $SORTMERNA_DB"
+echo "  rRNA Kraken2:  $RRNA_KRAKEN2_DB"
 echo ""
 
 # Load modules if needed (uncomment/modify as needed)
@@ -83,9 +89,10 @@ nextflow run ${PIPELINE_DIR}/main.nf \
     --kraken2_subsample 1000000 \
     --sex_markers_db "$SEX_MARKERS_DB" \
     --sortmerna_db "$SORTMERNA_DB" \
+    --rrna_kraken2_db "$RRNA_KRAKEN2_DB" \
     --project_name "$PROJECT_NAME" \
     --application "$APPLICATION" \
-    --name $PROJECT_NAME.$APPLICATION \
+    -name "$RUN_NAME" \
     -w "${RUN_DIR}/work" \
     -profile singularity \
     -c $SLURM_CONFIG \

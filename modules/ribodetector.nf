@@ -4,7 +4,8 @@
 ========================================================================================
     RiboDetector - ML-based rRNA detection without a reference database
     Adapted from nf-core/modules ribodetector module (v0.3.2)
-    Used here for rRNA quantification only (log output for MultiQC, reads not saved)
+    Used for rRNA quantification (log output) and optionally to save rRNA reads
+    for downstream Kraken2 classification (when save_rrna is true).
 */
 
 process RIBODETECTOR {
@@ -14,27 +15,34 @@ process RIBODETECTOR {
 
     input:
     tuple val(sample), path(reads)
-    val(length)    // sequenced read length (bp)
+    val(length)      // sequenced read length (bp)
+    val(save_rrna)   // whether to save rRNA reads for downstream classification
 
     output:
-    tuple val(sample), path("*.ribodetector.log"), emit: log
-    path "versions.yml"                           , emit: versions
+    tuple val(sample), path("*.ribodetector.log"),              emit: log
+    tuple val(sample), path("*_rrna*.fastq.gz"), optional: true, emit: rrna_reads
+    path "versions.yml"                                        , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def args   = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: sample
-    def paired = reads instanceof List && reads.size() == 2
+    def args       = task.ext.args ?: ''
+    def prefix     = task.ext.prefix ?: sample
+    def paired     = reads instanceof List && reads.size() == 2
     def input_cmd  = paired ? "-i ${reads[0]} ${reads[1]}" : "-i ${reads}"
     def output_cmd = paired \
         ? "-o ${prefix}.nonrna_1.fastq.gz ${prefix}.nonrna_2.fastq.gz" \
         : "-o ${prefix}.nonrna.fastq.gz"
+    def rrna_cmd   = save_rrna.toString() == 'true' \
+        ? (paired ? "--rrna ${prefix}_rrna_1.fastq.gz ${prefix}_rrna_2.fastq.gz"
+                  : "--rrna ${prefix}_rrna.fastq.gz") \
+        : ''
     """
     ribodetector_cpu \\
         ${input_cmd} \\
         ${output_cmd} \\
+        ${rrna_cmd} \\
         -l ${length} \\
         -t ${task.cpus} \\
         -e rrna \\
@@ -42,7 +50,7 @@ process RIBODETECTOR {
         --log ${prefix}.ribodetector.log \\
         ${args}
 
-    # Clean up read files — only the log is needed for QC
+    # Non-rRNA reads are not needed downstream
     rm -f ${prefix}.nonrna*.fastq.gz
 
     cat <<-END_VERSIONS > versions.yml
